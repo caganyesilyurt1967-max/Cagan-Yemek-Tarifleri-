@@ -29,6 +29,14 @@
     th, td{border:1px solid #ccc; padding:.5rem; text-align:left;}
     th{background:#0ea5e9; color:white;}
     #notification{ position:fixed; top:20px; right:20px; background:#10b981; color:white; padding:10px 20px; border-radius:5px; box-shadow:0 2px 10px rgba(0,0,0,.3); display:none; z-index:1000; }
+    .like-btn { background: #ffda7b; border: none; padding: 10px; cursor: pointer; margin-right:5px; }
+    .liked { background: #ffd700; }
+    .comments { margin-top: 16px; }
+    .comment-item { border-bottom: 1px solid #eee; margin-bottom: 8px; padding-bottom: 4px; }
+    .user { font-weight: bold; color: #0ea5e9; }
+    .comment-header { margin-bottom:6px; }
+    .comment-input-area { margin-top:6px; display:flex; gap:6px; }
+    .comment-textarea { flex:1; resize:vertical; min-height:32px; }
   </style>
 </head>
 <body>
@@ -165,8 +173,16 @@
   <footer>© 2025 Çağan Yemek Tarifleri</footer>
 
 <script>
-const ADMIN_USERNAME = "Çağan", ADMIN_PASSWORD = "1234";
-let users = JSON.parse(localStorage.getItem('users') || '[]');
+// --- Cihazlar arası ortak kullanıcı listesi (localStorage) ---
+function getAllUsers() {
+  let users = [];
+  try { users = JSON.parse(localStorage.getItem('users') || '[]'); } catch (e) { users = []; }
+  return users;
+}
+function setAllUsers(users) {
+  localStorage.setItem('users', JSON.stringify(users));
+}
+
 let favorites = JSON.parse(localStorage.getItem('favorites') || '{}');
 let recipes = JSON.parse(localStorage.getItem('recipes') || `[
   { "id": 1, "cat": "anayemek", "title": "İskender Kebap", "desc": "Bursa'nın meşhur yemeği.", "time": "30 dk", "portion": "4 kişilik", "zorluk": "Orta", "vegan": "Hayır", "gluten": "Hayır", "ing": ["500g döner", "1 pide", "Yoğurt", "Sos"], "steps": ["Pide doğranır", "Üzerine et konur", "Yoğurt ve sos dökülür"] },
@@ -177,6 +193,7 @@ let recipes = JSON.parse(localStorage.getItem('recipes') || `[
   { "id": 6, "cat": "icecek", "title": "Limonata", "desc": "Yaz aylarının vazgeçilmezi ev yapımı limonata.", "time": "15 dk", "portion": "4 kişilik", "zorluk": "Kolay", "vegan": "Evet", "gluten": "Evet", "ing": ["3 limon", "1 su bardağı şeker", "Su", "Nane yaprakları"], "steps": ["Limonlar sıkılır", "Şeker ve su ile karıştırılır", "Soğuk servis edilir"] }
 ]`);
 
+const ADMIN_USERNAME = "Çağan", ADMIN_PASSWORD = "1234";
 const loginDialog = document.getElementById('loginDialog');
 const loginForm = document.getElementById('loginForm');
 const registerBtn = document.getElementById('registerBtn');
@@ -209,6 +226,7 @@ function getDevice() { return navigator.userAgent; }
 
 loginForm.onsubmit = function (e) {
   e.preventDefault();
+  let users = getAllUsers();
   const u = this.username.value;
   const p = this.password.value;
   const found = users.find(x => x.username === u && x.password === p);
@@ -243,11 +261,12 @@ loginForm.onsubmit = function (e) {
 registerBtn.onclick = () => { loginDialog.close(); registerDialog.showModal(); };
 registerForm.onsubmit = function (e) {
   e.preventDefault();
+  let users = getAllUsers();
   const u = this.username.value;
   const p = this.password.value;
   if (users.find(x => x.username === u)) { alert('Kullanıcı zaten var'); return; }
   users.push({ username: u, password: p, isAdmin: false, isBlocked: false });
-  localStorage.setItem('users', JSON.stringify(users));
+  setAllUsers(users);
   alert('Kayıt başarılı, lütfen giriş yapın.');
   registerDialog.close();
   loginDialog.showModal();
@@ -256,6 +275,7 @@ registerForm.onsubmit = function (e) {
 adminBtn.onclick = function () {
   let u = prompt('Yönetici Adı');
   let p = prompt('Yönetici Şifre');
+  let users = getAllUsers();
   let adminUser = users.find(x => x.username === u && x.password === p && x.isAdmin);
   if ((u === ADMIN_USERNAME && p === ADMIN_PASSWORD) || adminUser) {
     if (adminUser && adminUser.isBlocked) {
@@ -274,6 +294,7 @@ adminBtn.onclick = function () {
 };
 
 function renderAdminPanel() {
+  let users = getAllUsers();
   const tbody = document.querySelector('#userTable tbody');
   const currentUser = localStorage.getItem('currentUser');
   tbody.innerHTML = '';
@@ -299,20 +320,24 @@ function renderAdminPanel() {
 }
 
 function blockUser(username) {
+  let users = getAllUsers();
   let user = users.find(u => u.username === username);
-  if (user) { user.isBlocked = true; localStorage.setItem('users', JSON.stringify(users)); renderAdminPanel(); }
+  if (user) { user.isBlocked = true; setAllUsers(users); renderAdminPanel(); }
 }
 function unblockUser(username) {
+  let users = getAllUsers();
   let user = users.find(u => u.username === username);
-  if (user) { user.isBlocked = false; localStorage.setItem('users', JSON.stringify(users)); renderAdminPanel(); }
+  if (user) { user.isBlocked = false; setAllUsers(users); renderAdminPanel(); }
 }
 function addAdmin(username) {
+  let users = getAllUsers();
   let user = users.find(u => u.username === username);
-  if (user) { user.isAdmin = true; localStorage.setItem('users', JSON.stringify(users)); renderAdminPanel(); }
+  if (user) { user.isAdmin = true; setAllUsers(users); renderAdminPanel(); }
 }
 function removeAdmin(username) {
+  let users = getAllUsers();
   let user = users.find(u => u.username === username);
-  if (user) { user.isAdmin = false; localStorage.setItem('users', JSON.stringify(users)); renderAdminPanel(); }
+  if (user) { user.isAdmin = false; setAllUsers(users); renderAdminPanel(); }
 }
 
 const recipeForm = document.getElementById('recipeForm');
@@ -379,24 +404,106 @@ function showNotification() {
   }, 2000);
 }
 
+// --- Beğeni & Yorum ---
+function getLikeCount(recipeId) {
+  let likes = JSON.parse(localStorage.getItem('likes') || '{}');
+  return likes[recipeId] ? likes[recipeId].length : 0;
+}
+function isRecipeLikedByUser(recipeId, user) {
+  let likes = JSON.parse(localStorage.getItem('likes') || '{}');
+  return likes[recipeId] && likes[recipeId].includes(user);
+}
+function likeRecipe(recipeId) {
+  const currentUser = localStorage.getItem('currentUser');
+  if (!currentUser) { alert("Lütfen giriş yapın."); return; }
+  let likes = JSON.parse(localStorage.getItem('likes') || '{}');
+  likes[recipeId] = likes[recipeId] || [];
+  const btn = document.getElementById("like-btn-" + recipeId);
+  if (likes[recipeId].includes(currentUser)) {
+    likes[recipeId] = likes[recipeId].filter(u => u !== currentUser);
+    btn.classList.remove("liked");
+  } else {
+    likes[recipeId].push(currentUser);
+    btn.classList.add("liked");
+  }
+  localStorage.setItem('likes', JSON.stringify(likes));
+  document.getElementById("like-count-" + recipeId).textContent = likes[recipeId].length;
+}
+function renderComments(recipeId) {
+  let comments = JSON.parse(localStorage.getItem('comments') || '{}');
+  if (!comments[recipeId] || comments[recipeId].length === 0) return "<i>Henüz yorum yok.</i>";
+  return comments[recipeId].map(c =>
+    `<div class="comment-item"><span class="user">${c.user}</span>: ${c.text}</div>`
+  ).join('');
+}
+function addComment(recipeId) {
+  const currentUser = localStorage.getItem('currentUser');
+  if (!currentUser) { alert("Lütfen giriş yapın."); return; }
+  const input = document.getElementById("comment-input-" + recipeId);
+  const text = input.value.trim();
+  if (!text) return;
+  let comments = JSON.parse(localStorage.getItem('comments') || '{}');
+  comments[recipeId] = comments[recipeId] || [];
+  comments[recipeId].push({ user: currentUser, text });
+  localStorage.setItem('comments', JSON.stringify(comments));
+  document.getElementById("comment-list-" + recipeId).innerHTML = renderComments(recipeId);
+  input.value = '';
+}
+
+// --- Tarif Gösterimi + Filtre + Arama ---
 function renderRecipes(list) {
   const currentUser = localStorage.getItem('currentUser');
-  const isAdmin = users.find(u => u.username === currentUser)?.isAdmin || (currentUser === ADMIN_USERNAME);
-  document.getElementById('recipes').innerHTML = list.map(r => `
-    <div class="recipe">
-      <h2>${r.title}</h2>
-      <div class="meta">⏱ ${r.time} | 🍽 ${r.portion}</div>
-      <p>${r.desc}</p>
-      <p><b>Malzemeler:</b> ${r.ing.join(", ")}</p>
-      <p><b>Yapılış:</b> ${r.steps.join(", ")}</p>
-      <button onclick="addToFavorites(${r.id})">⭐ Favorilere Ekle</button>
-      ${isAdmin ? `
-        <button onclick="editRecipe(${r.id})">Düzenle</button>
-        <button onclick="deleteRecipe(${r.id})">Sil</button>
-      ` : ''}
-    </div>
-  `).join('');
+  const isAdmin = getAllUsers().find(u => u.username === currentUser)?.isAdmin || (currentUser === ADMIN_USERNAME);
+  let searchText = (document.getElementById('search-input')?.value || '').toLowerCase();
+  let zorluk = (document.getElementById('filterZorluk')?.value || '');
+  let vegan = (document.getElementById('filterVegan')?.value || '');
+  let gluten = (document.getElementById('filterGluten')?.value || '');
+
+  let filtered = list.filter(r => {
+    let ok = true;
+    if (searchText && !(r.title.toLowerCase().includes(searchText) || r.desc.toLowerCase().includes(searchText))) ok = false;
+    if (zorluk && r.zorluk !== zorluk) ok = false;
+    if (vegan && r.vegan !== vegan) ok = false;
+    if (gluten && r.gluten !== gluten) ok = false;
+    return ok;
+  });
+
+  document.getElementById('recipes').innerHTML = filtered.map(r => {
+    const liked = currentUser && isRecipeLikedByUser(r.id, currentUser);
+    return `
+      <div class="recipe">
+        <h2>${r.title}</h2>
+        <div class="meta">⏱ ${r.time} | 🍽 ${r.portion}</div>
+        <p>${r.desc}</p>
+        <p><b>Malzemeler:</b> ${r.ing.join(", ")}</p>
+        <p><b>Yapılış:</b> ${r.steps.join(", ")}</p>
+        <button onclick="addToFavorites(${r.id})">⭐ Favorilere Ekle</button>
+        <button
+          class="like-btn${liked ? ' liked' : ''}"
+          onclick="likeRecipe(${r.id})"
+          id="like-btn-${r.id}"
+        >👍 Beğen (<span id="like-count-${r.id}">${getLikeCount(r.id)}</span>)</button>
+        <div class="comments">
+          <div class="comment-header"><b>Yorumlar</b></div>
+          <div id="comment-list-${r.id}">${renderComments(r.id)}</div>
+          <div class="comment-input-area">
+            <textarea id="comment-input-${r.id}" class="comment-textarea" placeholder="Yorum yaz..." rows="2"></textarea>
+            <button onclick="addComment(${r.id})">Gönder</button>
+          </div>
+        </div>
+        ${isAdmin ? `
+          <button onclick="editRecipe(${r.id})">Düzenle</button>
+          <button onclick="deleteRecipe(${r.id})">Sil</button>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
 }
+
+document.getElementById('search-input').addEventListener('input', () => renderRecipes(recipes));
+document.getElementById('filterZorluk').addEventListener('change', () => renderRecipes(recipes));
+document.getElementById('filterVegan').addEventListener('change', () => renderRecipes(recipes));
+document.getElementById('filterGluten').addEventListener('change', () => renderRecipes(recipes));
 
 function renderFavorites() {
   const currentUser = localStorage.getItem('currentUser');
@@ -420,12 +527,23 @@ changePassForm.onsubmit = function(e) {
   const currentUser = localStorage.getItem('currentUser');
   const newPass = this.newpass.value;
   if (currentUser === ADMIN_USERNAME) { alert("Ana yöneticinin şifresi değiştirilemez."); return; }
+  let users = getAllUsers();
   let user = users.find(u => u.username === currentUser);
   if (user) {
     user.password = newPass;
-    localStorage.setItem('users', JSON.stringify(users));
+    setAllUsers(users);
     alert("Şifreniz başarıyla değiştirildi.");
     profileDialog.close();
+  }
+};
+
+// --- Sayfa açılışında giriş kontrolü ---
+window.onload = function() {
+  if (localStorage.getItem('currentUser')) {
+    mainNav.style.display = 'block';
+    document.getElementById('content').style.display = 'block';
+    logoutBtn.style.display = 'block';
+    renderRecipes(recipes);
   }
 };
 </script>
